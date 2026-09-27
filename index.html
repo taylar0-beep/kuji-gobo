@@ -1,0 +1,853 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+  <title>九字護身法</title>
+  <style>
+    /* Base Styles & Reset */
+    * {
+      box-sizing: border-box;
+      user-select: none;
+      -webkit-user-select: none;
+      margin: 0;
+      padding: 0;
+    }
+    body, html {
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      background-color: #050508;
+      font-family: 'Hiragino Mincho ProN', 'Yu Mincho', 'Shippori Mincho', serif;
+      color: #fff;
+    }
+    #canvas-container {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      touch-action: none;
+    }
+    canvas {
+      display: block;
+      width: 100%;
+      height: 100%;
+    }
+    
+    /* UI Layering & Overlay */
+    #ui-overlay {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      pointer-events: none;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      padding: 20px;
+    }
+    .header {
+      text-align: center;
+      margin-top: 10px;
+      text-shadow: 0 0 10px rgba(0,229,255,0.8);
+      transition: opacity 0.5s ease-out;
+    }
+    .header.hidden-ui {
+      opacity: 0;
+    }
+    .header h1 {
+      font-size: clamp(1.2rem, 5vw, 1.8rem);
+      letter-spacing: 0.25em;
+      font-weight: 300;
+      color: #e0f7fa;
+    }
+    .header p {
+      font-size: clamp(0.7rem, 3vw, 0.85rem);
+      color: #80deea;
+      margin-top: 5px;
+      letter-spacing: 0.1em;
+      word-break: break-all;
+    }
+    #kuji-character-container {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      pointer-events: none;
+      text-align: center;
+      width: 90%;
+      max-width: 800px;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+    }
+    .kuji-char {
+      font-size: clamp(6rem, 25vw, 12rem);
+      font-weight: bold;
+      color: rgba(255, 255, 255, 0.95);
+      text-shadow: 0 0 30px #00e5ff, 0 0 60px #00e5ff, 0 0 90px #00b0ff;
+      opacity: 0;
+      transform: scale(0.5);
+      transition: transform 0.15s cubic-bezier(0.175, 0.885, 0.32, 1.275), opacity 0.15s ease-out;
+      position: absolute;
+    }
+    .kuji-char.active {
+      opacity: 1;
+      transform: scale(1);
+    }
+    
+    /* Purification Message Styling */
+    .purified-msg {
+      font-size: clamp(1.1rem, 5vw, 2.2rem);
+      letter-spacing: clamp(0.08em, 1.2vw, 0.25em);
+      color: #e0f7fa;
+      text-shadow: 0 0 15px #00e5ff, 0 0 30px #00e5ff, 0 0 45px #00b0ff;
+      opacity: 0;
+      transform: scale(0.8);
+      transition: transform 0.8s ease-out, opacity 0.8s ease-out;
+      width: 100%;
+      text-align: center;
+      white-space: nowrap;
+    }
+    .purified-msg.pentagram {
+      color: #ffffff;
+      text-shadow: 0 0 20px #80d8ff, 0 0 40px #00e5ff, 0 0 70px #00b0ff, 0 0 100px #00b0ff;
+    }
+    .purified-msg.active {
+      opacity: 1;
+      transform: scale(1);
+    }
+    
+    /* Footer Controls */
+    .footer {
+      position: absolute;
+      bottom: 25px;
+      right: 25px;
+    }
+    #reset-btn {
+      pointer-events: auto;
+      background: rgba(0, 229, 255, 0.1);
+      border: 1px solid rgba(0, 229, 255, 0.5);
+      color: #e0f7fa;
+      width: 44px;
+      height: 44px;
+      border-radius: 50%;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      backdrop-filter: blur(5px);
+      transition: all 0.3s ease;
+      box-shadow: 0 0 12px rgba(0, 229, 255, 0.2);
+    }
+    #reset-btn:hover {
+      background: rgba(0, 229, 255, 0.3);
+      border-color: #00e5ff;
+      box-shadow: 0 0 20px rgba(0, 229, 255, 0.6);
+      transform: rotate(180deg);
+    }
+    #reset-btn svg {
+      width: 20px;
+      height: 20px;
+      fill: #e0f7fa;
+    }
+    #audio-init {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(5, 5, 8, 0.92);
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      z-index: 100;
+      pointer-events: auto;
+      cursor: pointer;
+    }
+    #audio-init.hidden {
+      display: none;
+    }
+    .start-title {
+      font-size: clamp(1.6rem, 6vw, 2.2rem);
+      letter-spacing: 0.4em;
+      color: #e0f7fa;
+      margin-bottom: 20px;
+      text-shadow: 0 0 20px #00e5ff;
+    }
+    .start-btn {
+      border: 1px solid #00e5ff;
+      padding: 12px 30px;
+      border-radius: 30px;
+      color: #00e5ff;
+      letter-spacing: 0.2em;
+      box-shadow: 0 0 20px rgba(0, 229, 255, 0.4);
+      background: rgba(0, 229, 255, 0.05);
+      font-size: clamp(0.8rem, 3vw, 1rem);
+    }
+  </style>
+</head>
+<body>
+
+  <div id="canvas-container">
+    <canvas id="kuji-canvas"></canvas>
+  </div>
+
+  <div id="ui-overlay">
+    <div id="header" class="header">
+      <h1>九字護身法</h1>
+      <p id="kuji-progress">画面を切り裂いて九字を結べ</p>
+    </div>
+
+    <div id="kuji-character-container">
+      <div id="kuji-char" class="kuji-char">臨</div>
+      <div id="purified-msg" class="purified-msg">画面は浄化されました</div>
+    </div>
+
+    <div class="footer">
+      <button id="reset-btn" title="最初から">
+        <svg viewBox="0 0 24 24">
+          <path d="M17.65 6.35C16.2 4.9 14.21 4 12 4c-4.42 0-7.99 3.58-7.99 8s3.57 8 7.99 8c3.73 0 6.84-2.55 7.73-6h-2.08c-.82 2.33-3.04 4-5.65 4-3.31 0-6-2.69-6-6s2.69-6 6-6c1.66 0 3.14.69 4.22 1.78L13 11h7V4l-2.35 2.35z"/>
+        </svg>
+      </button>
+    </div>
+  </div>
+
+  <div id="audio-init">
+    <div class="start-title">九字護身法</div>
+    <div class="start-btn">画面をタップして開始</div>
+  </div>
+
+  <script>
+    /* Web Audio Sound Engine */
+    class KujiAudioEngine {
+      constructor() {
+        this.ctx = null;
+        this.initialized = false;
+      }
+
+      init() {
+        if (this.initialized) return;
+        const AudioContext = window.AudioContext || window.webkitAudioContext;
+        this.ctx = new AudioContext();
+        this.initialized = true;
+      }
+
+      playZantetsukenSound() {
+        if (!this.ctx) return;
+        if (this.ctx.state === 'suspended') {
+          this.ctx.resume();
+        }
+
+        const now = this.ctx.currentTime;
+
+        // 1. Air Cut Noise
+        const bufferSize = this.ctx.sampleRate * 0.18;
+        const buffer = this.ctx.createBuffer(1, bufferSize, this.ctx.sampleRate);
+        const data = buffer.getChannelData(0);
+        for (let i = 0; i < bufferSize; i++) {
+          data[i] = Math.random() * 2 - 1;
+        }
+
+        const noise = this.ctx.createBufferSource();
+        noise.buffer = buffer;
+
+        const hpFilter = this.ctx.createBiquadFilter();
+        hpFilter.type = 'highpass';
+        hpFilter.frequency.setValueAtTime(2500, now);
+        hpFilter.frequency.exponentialRampToValueAtTime(700, now + 0.18);
+
+        const noiseGain = this.ctx.createGain();
+        noiseGain.gain.setValueAtTime(1.0, now);
+        noiseGain.gain.exponentialRampToValueAtTime(0.001, now + 0.18);
+
+        noise.connect(hpFilter);
+        hpFilter.connect(noiseGain);
+        noiseGain.connect(this.ctx.destination);
+
+        noise.start(now);
+        noise.stop(now + 0.18);
+
+        // 2. Heavy Steel Impact
+        const saw = this.ctx.createOscillator();
+        const sawGain = this.ctx.createGain();
+        saw.type = 'sawtooth';
+        saw.frequency.setValueAtTime(220, now);
+        saw.frequency.exponentialRampToValueAtTime(55, now + 0.2);
+
+        sawGain.gain.setValueAtTime(0.85, now);
+        sawGain.gain.exponentialRampToValueAtTime(0.001, now + 0.2);
+
+        const lpFilter = this.ctx.createBiquadFilter();
+        lpFilter.type = 'lowpass';
+        lpFilter.frequency.setValueAtTime(3500, now);
+        lpFilter.frequency.exponentialRampToValueAtTime(250, now + 0.2);
+
+        saw.connect(lpFilter);
+        lpFilter.connect(sawGain);
+        sawGain.connect(this.ctx.destination);
+
+        saw.start(now);
+        saw.stop(now + 0.2);
+
+        // 3. Ring
+        const ring = this.ctx.createOscillator();
+        const ringGain = this.ctx.createGain();
+        ring.type = 'sine';
+        ring.frequency.setValueAtTime(880, now);
+
+        ringGain.gain.setValueAtTime(0.12, now);
+        ringGain.gain.exponentialRampToValueAtTime(0.0001, now + 0.7);
+
+        ring.connect(ringGain);
+        ringGain.connect(this.ctx.destination);
+
+        ring.start(now);
+        ring.stop(now + 0.7);
+      }
+
+      playBarrierSound() {
+        if (!this.ctx) return;
+        const now = this.ctx.currentTime;
+
+        const sub = this.ctx.createOscillator();
+        const subGain = this.ctx.createGain();
+        sub.type = 'sine';
+        sub.frequency.setValueAtTime(160, now);
+        sub.frequency.exponentialRampToValueAtTime(25, now + 2.5);
+
+        subGain.gain.setValueAtTime(0.9, now);
+        subGain.gain.exponentialRampToValueAtTime(0.001, now + 2.5);
+
+        sub.connect(subGain);
+        subGain.connect(this.ctx.destination);
+
+        sub.start(now);
+        sub.stop(now + 2.5);
+
+        [220, 277.18, 329.63, 440, 554.37, 659.25, 880].forEach((freq) => {
+          const osc = this.ctx.createOscillator();
+          const gain = this.ctx.createGain();
+          osc.type = 'triangle';
+          osc.frequency.value = freq;
+
+          gain.gain.setValueAtTime(0.01, now);
+          gain.gain.linearRampToValueAtTime(0.18, now + 0.2);
+          gain.gain.exponentialRampToValueAtTime(0.0001, now + 3.5);
+
+          osc.connect(gain);
+          gain.connect(this.ctx.destination);
+
+          osc.start(now);
+          osc.stop(now + 3.5);
+        });
+      }
+
+      playPentagramSound() {
+        if (!this.ctx) return;
+        const now = this.ctx.currentTime;
+
+        // Solfeggio Scale Harmonics
+        const frequencies = [528, 660, 792, 1056, 1320];
+        frequencies.forEach((freq, idx) => {
+          const osc = this.ctx.createOscillator();
+          const gain = this.ctx.createGain();
+          osc.type = 'sine';
+          osc.frequency.setValueAtTime(freq, now + idx * 0.08);
+
+          gain.gain.setValueAtTime(0.001, now + idx * 0.08);
+          gain.gain.exponentialRampToValueAtTime(0.25, now + idx * 0.08 + 0.05);
+          gain.gain.exponentialRampToValueAtTime(0.0001, now + idx * 0.08 + 3.0);
+
+          osc.connect(gain);
+          gain.connect(this.ctx.destination);
+
+          osc.start(now + idx * 0.08);
+          osc.stop(now + idx * 0.08 + 3.0);
+        });
+
+        // Deep Bass Resonance
+        const sub = this.ctx.createOscillator();
+        const subGain = this.ctx.createGain();
+        sub.type = 'triangle';
+        sub.frequency.setValueAtTime(110, now);
+        sub.frequency.exponentialRampToValueAtTime(55, now + 2.0);
+
+        subGain.gain.setValueAtTime(0.6, now);
+        subGain.gain.exponentialRampToValueAtTime(0.001, now + 2.0);
+
+        sub.connect(subGain);
+        subGain.connect(this.ctx.destination);
+
+        sub.start(now);
+        sub.stop(now + 2.0);
+      }
+    }
+
+    /* Particle System */
+    class Particle {
+      constructor(x, y, color) {
+        this.x = x;
+        this.y = y;
+        this.vx = (Math.random() - 0.5) * 8;
+        this.vy = (Math.random() - 0.5) * 8;
+        this.life = 1.0;
+        this.decay = Math.random() * 0.03 + 0.015;
+        this.size = Math.random() * 4 + 2;
+        this.color = color || '#00e5ff';
+      }
+
+      update() {
+        this.x += this.vx;
+        this.y += this.vy;
+        this.vx *= 0.95;
+        this.vy *= 0.95;
+        this.life -= this.decay;
+      }
+
+      draw(ctx) {
+        ctx.save();
+        ctx.globalAlpha = Math.max(0, this.life);
+        ctx.fillStyle = this.color;
+        ctx.shadowColor = this.color;
+        ctx.shadowBlur = 10;
+        ctx.beginPath();
+        ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.restore();
+      }
+    }
+
+    /* Secret Pentagram Detection Algorithm */
+    function detectPentagram(rawPath) {
+      if (!rawPath || rawPath.length < 25) return null;
+
+      const start = rawPath[0];
+      const end = rawPath[rawPath.length - 1];
+      const totalLen = rawPath.reduce((acc, p, idx) => idx === 0 ? 0 : acc + Math.hypot(p.x - rawPath[idx - 1].x, p.y - rawPath[idx - 1].y), 0);
+
+      if (totalLen < 120) return null;
+
+      const closeDist = Math.hypot(start.x - end.x, start.y - end.y);
+      if (closeDist / totalLen > 0.35) return null;
+
+      // Find sharp corners (Vertices of the star)
+      let corners = [];
+      for (let i = 1; i < rawPath.length - 1; i++) {
+        let pPrev = rawPath[Math.max(0, i - 4)];
+        let pCurr = rawPath[i];
+        let pNext = rawPath[Math.min(rawPath.length - 1, i + 4)];
+
+        let v1 = { x: pPrev.x - pCurr.x, y: pPrev.y - pCurr.y };
+        let v2 = { x: pNext.x - pCurr.x, y: pNext.y - pCurr.y };
+
+        let dot = v1.x * v2.x + v1.y * v2.y;
+        let mag1 = Math.hypot(v1.x, v1.y);
+        let mag2 = Math.hypot(v2.x, v2.y);
+
+        if (mag1 > 0 && mag2 > 0) {
+          let angle = Math.acos(Math.max(-1, Math.min(1, dot / (mag1 * mag2))));
+          if (angle < 1.4) {
+            if (corners.length === 0 || Math.hypot(pCurr.x - corners[corners.length - 1].x, pCurr.y - corners[corners.length - 1].y) > totalLen * 0.1) {
+              corners.push(pCurr);
+            }
+          }
+        }
+      }
+
+      // Check self-intersections
+      function doLinesIntersect(p1, p2, p3, p4) {
+        function ccw(A, B, C) {
+          return (C.y - A.y) * (B.x - A.x) > (B.y - A.y) * (C.x - A.x);
+        }
+        return (ccw(p1, p3, p4) !== ccw(p2, p3, p4)) && (ccw(p1, p2, p3) !== ccw(p1, p2, p4));
+      }
+
+      let intersections = 0;
+      let segments = [];
+      const step = Math.floor(rawPath.length / 10);
+      for (let i = 0; i < rawPath.length - step; i += step) {
+        segments.push({ p1: rawPath[i], p2: rawPath[i + step] });
+      }
+
+      for (let i = 0; i < segments.length; i++) {
+        for (let j = i + 2; j < segments.length; j++) {
+          if (i === 0 && j === segments.length - 1) continue;
+          if (doLinesIntersect(segments[i].p1, segments[i].p2, segments[j].p1, segments[j].p2)) {
+            intersections++;
+          }
+        }
+      }
+
+      // Criteria matching a single-stroke star
+      if ((corners.length >= 5 && corners.length <= 7) || (intersections >= 4 && intersections <= 7)) {
+        let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
+        rawPath.forEach(p => {
+          if (p.x < minX) minX = p.x;
+          if (p.x > maxX) maxX = p.x;
+          if (p.y < minY) minY = p.y;
+          if (p.y > maxY) maxY = p.y;
+        });
+
+        const centerX = (minX + maxX) / 2;
+        const centerY = (minY + maxY) / 2;
+        const radius = Math.max(maxX - minX, maxY - minY) / 2;
+
+        return { centerX, centerY, radius, corners };
+      }
+
+      return null;
+    }
+
+    /* Main Application Controller */
+    const KujiKanji = ['臨', '兵', '闘', '者', '皆', '陣', '烈', '在', '前'];
+    const canvas = document.getElementById('kuji-canvas');
+    const ctx = canvas.getContext('2d');
+    const audioEngine = new KujiAudioEngine();
+
+    let width = 0;
+    let height = 0;
+
+    let kujiIndex = 0;
+    let strokePaths = [];
+    let currentPath = null;
+    let isDrawing = false;
+    let particles = [];
+
+    let isBarrierActive = false;
+    let barrierType = 'kuji';
+    let barrierTime = 0;
+    let pentagramData = null;
+
+    const charElement = document.getElementById('kuji-char');
+    const purifiedMsgElement = document.getElementById('purified-msg');
+    const headerElement = document.getElementById('header');
+    const audioInitBtn = document.getElementById('audio-init');
+    const resetBtn = document.getElementById('reset-btn');
+
+    function resizeCanvas() {
+      width = window.innerWidth;
+      height = window.innerHeight;
+      canvas.width = width * window.devicePixelRatio;
+      canvas.height = height * window.devicePixelRatio;
+      ctx.scale(window.devicePixelRatio, window.devicePixelRatio);
+    }
+
+    window.addEventListener('resize', resizeCanvas);
+    resizeCanvas();
+
+    audioInitBtn.addEventListener('click', () => {
+      audioEngine.init();
+      audioInitBtn.classList.add('hidden');
+    });
+
+    function getPos(e) {
+      if (e.touches && e.touches.length > 0) {
+        return { x: e.touches[0].clientX, y: e.touches[0].clientY };
+      }
+      return { x: e.clientX, y: e.clientY };
+    }
+
+    function startStroke(pos) {
+      if (isBarrierActive) return;
+
+      charElement.classList.remove('active');
+
+      if (kujiIndex < 9) {
+        charElement.innerText = KujiKanji[kujiIndex];
+        void charElement.offsetWidth;
+        charElement.classList.add('active');
+
+        audioEngine.playZantetsukenSound();
+      }
+
+      isDrawing = true;
+      currentPath = [pos];
+    }
+
+    function moveStroke(pos) {
+      if (!isDrawing || isBarrierActive) return;
+
+      currentPath.push(pos);
+
+      for (let i = 0; i < 3; i++) {
+        particles.push(new Particle(pos.x, pos.y, '#00e5ff'));
+      }
+    }
+
+    function endStroke() {
+      if (!isDrawing || isBarrierActive) return;
+      isDrawing = false;
+
+      if (currentPath && currentPath.length > 1) {
+        const starDetected = detectPentagram(currentPath);
+
+        if (starDetected) {
+          strokePaths.push({ path: currentPath, index: kujiIndex });
+          triggerPentagramBarrier(starDetected);
+          currentPath = null;
+          return;
+        }
+
+        strokePaths.push({
+          path: currentPath,
+          index: kujiIndex
+        });
+
+        kujiIndex++;
+
+        if (kujiIndex === 9) {
+          setTimeout(() => {
+            charElement.classList.remove('active');
+          }, 150);
+
+          triggerKujiBarrierEffect();
+        }
+      }
+      currentPath = null;
+    }
+
+    canvas.addEventListener('mousedown', (e) => startStroke(getPos(e)));
+    canvas.addEventListener('mousemove', (e) => moveStroke(getPos(e)));
+    window.addEventListener('mouseup', endStroke);
+
+    canvas.addEventListener('touchstart', (e) => {
+      e.preventDefault();
+      startStroke(getPos(e));
+    }, { passive: false });
+
+    canvas.addEventListener('touchmove', (e) => {
+      e.preventDefault();
+      moveStroke(getPos(e));
+    }, { passive: false });
+
+    window.addEventListener('touchend', endStroke);
+
+    resetBtn.addEventListener('click', () => {
+      strokePaths = [];
+      kujiIndex = 0;
+      isBarrierActive = false;
+      pentagramData = null;
+      charElement.classList.remove('active');
+      headerElement.classList.remove('hidden-ui');
+      purifiedMsgElement.classList.remove('pentagram');
+      purifiedMsgElement.classList.remove('active');
+      purifiedMsgElement.innerText = "画面は浄化されました";
+    });
+
+    function triggerKujiBarrierEffect() {
+      isBarrierActive = true;
+      barrierType = 'kuji';
+      barrierTime = 0;
+      audioEngine.playBarrierSound();
+
+      purifiedMsgElement.innerText = "画面は浄化されました";
+      purifiedMsgElement.classList.remove('pentagram');
+      setTimeout(() => {
+        purifiedMsgElement.classList.add('active');
+      }, 400);
+
+      strokePaths.forEach((stroke) => {
+        stroke.path.forEach((pt) => {
+          for (let i = 0; i < 2; i++) {
+            particles.push(new Particle(pt.x, pt.y, Math.random() > 0.5 ? '#00e5ff' : '#80deea'));
+          }
+        });
+      });
+    }
+
+    function triggerPentagramBarrier(star) {
+      isBarrierActive = true;
+      barrierType = 'pentagram';
+      barrierTime = 0;
+      pentagramData = star;
+
+      // Hide 九字 UI Elements on Pentagram Activation
+      charElement.classList.remove('active');
+      headerElement.classList.add('hidden-ui');
+
+      audioEngine.playPentagramSound();
+
+      purifiedMsgElement.innerText = "五芒星の結界が展開されました";
+      purifiedMsgElement.classList.add('pentagram');
+      setTimeout(() => {
+        purifiedMsgElement.classList.add('active');
+      }, 300);
+
+      for (let i = 0; i < 150; i++) {
+        const p = new Particle(star.centerX, star.centerY, Math.random() > 0.3 ? '#80d8ff' : '#ffffff');
+        p.vx = (Math.random() - 0.5) * 16;
+        p.vy = (Math.random() - 0.5) * 16;
+        p.size = Math.random() * 6 + 2;
+        particles.push(p);
+      }
+    }
+
+    /* Animation Frame Render Loop */
+    function render() {
+      ctx.clearRect(0, 0, width, height);
+
+      // Draw stroke paths (For pentagram, user's drawn stroke glows vibrantly)
+      strokePaths.forEach((stroke) => {
+        if (isBarrierActive && barrierType === 'pentagram') {
+          const pulseGlow = Math.sin(barrierTime * 4) * 10 + 25;
+          drawStrokePath(stroke.path, '#ffffff', 8, true, '#00e5ff', pulseGlow);
+        } else {
+          drawStrokePath(stroke.path, '#00e5ff', 6, true);
+        }
+      });
+
+      if (currentPath && currentPath.length > 1) {
+        drawStrokePath(currentPath, '#ffffff', 8, true);
+      }
+
+      for (let i = particles.length - 1; i >= 0; i--) {
+        const p = particles[i];
+        p.update();
+        p.draw(ctx);
+        if (p.life <= 0) {
+          particles.splice(i, 1);
+        }
+      }
+
+      if (isBarrierActive) {
+        barrierTime += 0.03;
+
+        if (barrierType === 'kuji') {
+          const glowRadius = Math.sin(barrierTime * 2) * 20 + 30;
+
+          ctx.save();
+          ctx.strokeStyle = `rgba(0, 229, 255, ${Math.min(1, barrierTime * 0.5)})`;
+          ctx.shadowColor = '#00e5ff';
+          ctx.shadowBlur = glowRadius;
+          ctx.lineWidth = 10;
+
+          strokePaths.forEach((stroke) => {
+            if (stroke.path.length < 2) return;
+            ctx.beginPath();
+            ctx.moveTo(stroke.path[0].x, stroke.path[0].y);
+            for (let i = 1; i < stroke.path.length; i++) {
+              ctx.lineTo(stroke.path[i].x, stroke.path[i].y);
+            }
+            ctx.stroke();
+          });
+          ctx.restore();
+
+          const centerX = width / 2;
+          const centerY = height / 2;
+          const radius = Math.min(width, height) * 0.38;
+
+          ctx.save();
+          ctx.translate(centerX, centerY);
+          ctx.rotate(barrierTime * 0.2);
+
+          ctx.strokeStyle = 'rgba(0, 229, 255, 0.6)';
+          ctx.lineWidth = 2;
+          ctx.beginPath();
+          ctx.arc(0, 0, radius, 0, Math.PI * 2);
+          ctx.stroke();
+
+          for (let i = 0; i < 9; i++) {
+            const angle = (i * Math.PI * 2) / 9;
+            const x = Math.cos(angle) * radius;
+            const y = Math.sin(angle) * radius;
+
+            ctx.save();
+            ctx.translate(x, y);
+            ctx.rotate(angle + Math.PI / 2);
+            ctx.font = '24px serif';
+            ctx.fillStyle = '#00e5ff';
+            ctx.shadowColor = '#00e5ff';
+            ctx.shadowBlur = 15;
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText(KujiKanji[i], 0, 0);
+            ctx.restore();
+          }
+          ctx.restore();
+
+        } else if (barrierType === 'pentagram' && pentagramData) {
+          const { centerX, centerY, radius } = pentagramData;
+          const pulse = Math.sin(barrierTime * 3) * 15 + 35;
+
+          // Double Rotating Magic Circles around drawn Pentagram
+          ctx.save();
+          ctx.translate(centerX, centerY);
+
+          ctx.save();
+          ctx.rotate(barrierTime * 0.3);
+          ctx.strokeStyle = 'rgba(128, 216, 255, 0.8)';
+          ctx.lineWidth = 3;
+          ctx.shadowColor = '#00e5ff';
+          ctx.shadowBlur = pulse;
+          ctx.beginPath();
+          ctx.arc(0, 0, radius * 1.25, 0, Math.PI * 2);
+          ctx.stroke();
+
+          for (let i = 0; i < 5; i++) {
+            const angle = (i * Math.PI * 2) / 5 - Math.PI / 2;
+            const px = Math.cos(angle) * radius * 1.25;
+            const py = Math.sin(angle) * radius * 1.25;
+            ctx.fillStyle = '#ffffff';
+            ctx.beginPath();
+            ctx.arc(px, py, 5, 0, Math.PI * 2);
+            ctx.fill();
+          }
+          ctx.restore();
+
+          ctx.save();
+          ctx.rotate(-barrierTime * 0.2);
+          ctx.strokeStyle = 'rgba(255, 255, 255, 0.5)';
+          ctx.lineWidth = 1.5;
+          ctx.beginPath();
+          ctx.arc(0, 0, radius * 1.05, 0, Math.PI * 2);
+          ctx.stroke();
+          ctx.restore();
+
+          // Light beam emission from core
+          const beamGlow = ctx.createRadialGradient(0, 0, 0, 0, 0, radius * 1.3);
+          beamGlow.addColorStop(0, 'rgba(255, 255, 255, 0.35)');
+          beamGlow.addColorStop(0.5, 'rgba(0, 229, 255, 0.15)');
+          beamGlow.addColorStop(1, 'rgba(0, 0, 0, 0)');
+          ctx.fillStyle = beamGlow;
+          ctx.beginPath();
+          ctx.arc(0, 0, radius * 1.3, 0, Math.PI * 2);
+          ctx.fill();
+
+          ctx.restore();
+        }
+      }
+
+      requestAnimationFrame(render);
+    }
+
+    function drawStrokePath(path, color, lineWidth, glow = false, shadowColor = null, shadowBlur = 15) {
+      if (path.length < 2) return;
+
+      ctx.save();
+      ctx.strokeStyle = color;
+      ctx.lineWidth = lineWidth;
+      ctx.lineCap = 'round';
+      ctx.lineJoin = 'round';
+
+      if (glow) {
+        ctx.shadowColor = shadowColor || color;
+        ctx.shadowBlur = shadowBlur;
+      }
+
+      ctx.beginPath();
+      ctx.moveTo(path[0].x, path[0].y);
+      for (let i = 1; i < path.length; i++) {
+        ctx.lineTo(path[i].x, path[i].y);
+      }
+      ctx.stroke();
+      ctx.restore();
+    }
+
+    requestAnimationFrame(render);
+  </script>
+</body>
+</html>
